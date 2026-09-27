@@ -1,0 +1,703 @@
+-- KINGG.VS Hub UI
+-- Updated: Save Now label + Auto Save/Load + Working Hide Mobile Buttons
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KinggVSHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- ====================== CONFIG SYSTEM ======================
+local ConfigFile = "KINGGVS_Config.txt"
+local Config = {
+	Scale = 1,
+	HideMobileButtons = false,
+	AutoSave = true,
+}
+
+local function SaveConfig()
+	local success, err = pcall(function()
+		writefile(ConfigFile, game:GetService("HttpService"):JSONEncode(Config))
+	end)
+	if not success then
+		warn("Could not save config (executor may not support writefile)")
+	end
+end
+
+local function LoadConfig()
+	local success, data = pcall(function()
+		if isfile and isfile(ConfigFile) then
+			return game:GetService("HttpService"):JSONDecode(readfile(ConfigFile))
+		end
+		return nil
+	end)
+	if success and data then
+		for k, v in pairs(data) do
+			Config[k] = v
+		end
+	end
+end
+
+LoadConfig()
+
+-- ====================== FLOATING KINGG.VS BUTTON ======================
+local OpenBtn = Instance.new("TextButton")
+OpenBtn.Name = "OpenButton"
+OpenBtn.Size = UDim2.new(0, 130, 0, 38)
+OpenBtn.Position = UDim2.new(0, 20, 0.5, -19)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+OpenBtn.Text = "KINGG.VS"
+OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+OpenBtn.Font = Enum.Font.GothamBold
+OpenBtn.TextSize = 16
+OpenBtn.ZIndex = 50
+OpenBtn.Parent = ScreenGui
+Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(1, 0)
+
+local openDragging, openDragStart, openStartPos
+OpenBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		openDragging = true
+		openDragStart = input.Position
+		openStartPos = OpenBtn.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then openDragging = false end
+		end)
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if openDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - openDragStart
+		OpenBtn.Position = UDim2.new(openStartPos.X.Scale, openStartPos.X.Offset + delta.X, openStartPos.Y.Scale, openStartPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- ====================== FLOATING ACTION BUTTONS ======================
+local ActionButtonsData = {
+	{Name = "DROP BR",    Pos = UDim2.new(1, -180, 0.12, 0)},
+	{Name = "AUTO LEFT",  Pos = UDim2.new(1, -90,  0.12, 0)},
+	{Name = "BAT BOT",    Pos = UDim2.new(1, -180, 0.12, 50)},
+	{Name = "AUTO RIGHT", Pos = UDim2.new(1, -90,  0.12, 50)},
+	{Name = "TP DOWN",    Pos = UDim2.new(1, -180, 0.12, 100)},
+	{Name = "CARRY SPD",  Pos = UDim2.new(1, -90,  0.12, 100)},
+	{Name = "INSTA RESET",Pos = UDim2.new(1, -180, 0.12, 150)},
+	{Name = "LAGGER MODE",Pos = UDim2.new(1, -90,  0.12, 150)},
+	{Name = "TP BAT",     Pos = UDim2.new(1, -135, 0.12, 200)},
+}
+
+local ActionButtons = {}
+
+local function MakeDraggable(btn)
+	local dragging, dragStart, startPos
+	btn.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = btn.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			btn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+for _, data in ipairs(ActionButtonsData) do
+	local btn = Instance.new("TextButton")
+	btn.Name = data.Name
+	btn.Size = UDim2.new(0, 80, 0, 40)
+	btn.Position = data.Pos
+	btn.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+	btn.Text = data.Name
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 12
+	btn.ZIndex = 50
+	btn.Parent = ScreenGui
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+	MakeDraggable(btn)
+	ActionButtons[data.Name] = btn
+
+	btn.MouseButton1Click:Connect(function()
+		print(data.Name .. " pressed")
+	end)
+end
+
+local function SetMobileButtonsVisible(visible)
+	for _, btn in pairs(ActionButtons) do
+		btn.Visible = visible
+	end
+end
+
+-- Apply saved Hide Mobile Buttons state
+SetMobileButtonsVisible(not Config.HideMobileButtons)
+
+-- ====================== MAIN UI ======================
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.new(0, 460, 0, 420)
+Main.Position = UDim2.new(0.5, -230, 0.5, -210)
+Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.ClipsDescendants = true
+Main.Visible = false
+Main.Parent = ScreenGui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
+
+local OriginalSize = Vector2.new(460, 420)
+local CurrentScale = Config.Scale or 1
+
+local Background = Instance.new("ImageLabel")
+Background.Size = UDim2.new(1, 0, 1, 0)
+Background.BackgroundTransparency = 1
+Background.Image = "rbxassetid://736180410" -- << YOUR BACKGROUND IMAGE ID
+Background.ScaleType = Enum.ScaleType.Crop
+Background.ImageTransparency = 0.25
+Background.ZIndex = 1
+Background.Parent = Main
+Instance.new("UICorner", Background).CornerRadius = UDim.new(0, 14)
+
+local Overlay = Instance.new("Frame")
+Overlay.Size = UDim2.new(1, 0, 1, 0)
+Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Overlay.BackgroundTransparency = 0.55
+Overlay.ZIndex = 2
+Overlay.Parent = Main
+Instance.new("UICorner", Overlay).CornerRadius = UDim.new(0, 14)
+
+-- Top Bar
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 46)
+TopBar.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
+TopBar.BackgroundTransparency = 0.3
+TopBar.BorderSizePixel = 0
+TopBar.ZIndex = 10
+TopBar.Parent = Main
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 14)
+
+local Logo = Instance.new("ImageLabel")
+Logo.Size = UDim2.new(0, 30, 0, 30)
+Logo.Position = UDim2.new(0, 10, 0.5, -15)
+Logo.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+Logo.Image = "rbxassetid://736180410"
+Logo.ScaleType = Enum.ScaleType.Crop
+Logo.ZIndex = 11
+Logo.Parent = TopBar
+Instance.new("UICorner", Logo).CornerRadius = UDim.new(0, 7)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0, 180, 1, 0)
+Title.Position = UDim2.new(0, 48, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "KINGG.VS"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.ZIndex = 11
+Title.Parent = TopBar
+
+local Stats = Instance.new("TextLabel")
+Stats.Size = UDim2.new(0, 150, 1, 0)
+Stats.Position = UDim2.new(1, -195, 0, 0)
+Stats.BackgroundTransparency = 1
+Stats.Text = "Ping: --  ·  FPS: --"
+Stats.TextColor3 = Color3.fromRGB(180, 180, 195)
+Stats.Font = Enum.Font.Gotham
+Stats.TextSize = 12
+Stats.TextXAlignment = Enum.TextXAlignment.Right
+Stats.ZIndex = 11
+Stats.Parent = TopBar
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 28, 0, 28)
+MinBtn.Position = UDim2.new(1, -38, 0.5, -14)
+MinBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+MinBtn.Text = "−"
+MinBtn.TextColor3 = Color3.fromRGB(230, 230, 240)
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 18
+MinBtn.ZIndex = 11
+MinBtn.Parent = TopBar
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 7)
+
+-- Sidebar
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 100, 1, -46)
+Sidebar.Position = UDim2.new(1, -100, 0, 46)
+Sidebar.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
+Sidebar.BackgroundTransparency = 0.25
+Sidebar.BorderSizePixel = 0
+Sidebar.ZIndex = 10
+Sidebar.Parent = Main
+
+local Tabs = {"Speed", "Combat", "Steal", "Visual", "Interface"}
+local TabButtons = {}
+local ContentContainer = nil
+
+local function CreateTabButton(name, order)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -14, 0, 38)
+	btn.Position = UDim2.new(0, 7, 0, 12 + (order-1)*44)
+	btn.BackgroundTransparency = 1
+	btn.Text = name
+	btn.TextColor3 = Color3.fromRGB(140, 140, 155)
+	btn.Font = Enum.Font.GothamSemibold
+	btn.TextSize = 14
+	btn.ZIndex = 11
+	btn.Parent = Sidebar
+
+	local indicator = Instance.new("Frame")
+	indicator.Name = "Indicator"
+	indicator.Size = UDim2.new(0, 3, 0, 20)
+	indicator.Position = UDim2.new(0, 0, 0.5, -10)
+	indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	indicator.BorderSizePixel = 0
+	indicator.Visible = false
+	indicator.ZIndex = 12
+	indicator.Parent = btn
+	Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
+
+	TabButtons[name] = {Button = btn, Indicator = indicator}
+end
+
+for i, name in ipairs(Tabs) do
+	CreateTabButton(name, i)
+end
+
+-- Helpers
+local function ClearContent()
+	if ContentContainer then ContentContainer:Destroy() end
+	ContentContainer = Instance.new("ScrollingFrame")
+	ContentContainer.Size = UDim2.new(1, -115, 1, -58)
+	ContentContainer.Position = UDim2.new(0, 10, 0, 52)
+	ContentContainer.BackgroundTransparency = 1
+	ContentContainer.ScrollBarThickness = 3
+	ContentContainer.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 100)
+	ContentContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+	ContentContainer.ZIndex = 10
+	ContentContainer.Parent = Main
+end
+
+local function CreateSection(text, y)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -10, 0, 24)
+	label.Position = UDim2.new(0, 6, 0, y)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(130, 130, 150)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 12
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.ZIndex = 11
+	label.Parent = ContentContainer
+	return y + 28
+end
+
+local function CreateToggle(text, y, default, callback)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, -8, 0, 40)
+	frame.Position = UDim2.new(0, 4, 0, y)
+	frame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+	frame.BackgroundTransparency = 0.2
+	frame.ZIndex = 11
+	frame.Parent = ContentContainer
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 9)
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(0.7, 0, 1, 0)
+	label.Position = UDim2.new(0, 12, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(235, 235, 245)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 14
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.ZIndex = 12
+	label.Parent = frame
+
+	local toggleBg = Instance.new("Frame")
+	toggleBg.Size = UDim2.new(0, 42, 0, 24)
+	toggleBg.Position = UDim2.new(1, -54, 0.5, -12)
+	toggleBg.BackgroundColor3 = default and Color3.fromRGB(100, 50, 180) or Color3.fromRGB(45, 45, 55)
+	toggleBg.ZIndex = 12
+	toggleBg.Parent = frame
+	Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
+
+	local circle = Instance.new("Frame")
+	circle.Size = UDim2.new(0, 20, 0, 20)
+	circle.Position = default and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
+	circle.BackgroundColor3 = Color3.fromRGB(240, 240, 250)
+	circle.ZIndex = 13
+	circle.Parent = toggleBg
+	Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+	local enabled = default
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 1, 0)
+	btn.BackgroundTransparency = 1
+	btn.Text = ""
+	btn.ZIndex = 14
+	btn.Parent = frame
+
+	btn.MouseButton1Click:Connect(function()
+		enabled = not enabled
+		TweenService:Create(toggleBg, TweenInfo.new(0.18), {
+			BackgroundColor3 = enabled and Color3.fromRGB(100, 50, 180) or Color3.fromRGB(45, 45, 55)
+		}):Play()
+		TweenService:Create(circle, TweenInfo.new(0.18), {
+			Position = enabled and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
+		}):Play()
+		if callback then callback(enabled) end
+	end)
+	return y + 48
+end
+
+local function CreateValue(text, value, y)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, -8, 0, 40)
+	frame.Position = UDim2.new(0, 4, 0, y)
+	frame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+	frame.BackgroundTransparency = 0.2
+	frame.ZIndex = 11
+	frame.Parent = ContentContainer
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 9)
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(0.6, 0, 1, 0)
+	label.Position = UDim2.new(0, 12, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(235, 235, 245)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 14
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.ZIndex = 12
+	label.Parent = frame
+
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.Size = UDim2.new(0, 65, 1, 0)
+	valueLabel.Position = UDim2.new(1, -72, 0, 0)
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Text = tostring(value)
+	valueLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
+	valueLabel.Font = Enum.Font.GothamMedium
+	valueLabel.TextSize = 14
+	valueLabel.ZIndex = 12
+	valueLabel.Parent = frame
+	return y + 48
+end
+
+local function CreateKeybind(text, key, y)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, -8, 0, 40)
+	frame.Position = UDim2.new(0, 4, 0, y)
+	frame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+	frame.BackgroundTransparency = 0.2
+	frame.ZIndex = 11
+	frame.Parent = ContentContainer
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 9)
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(0.6, 0, 1, 0)
+	label.Position = UDim2.new(0, 12, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(235, 235, 245)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 14
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.ZIndex = 12
+	label.Parent = frame
+
+	local keyBox = Instance.new("TextLabel")
+	keyBox.Size = UDim2.new(0, 48, 0, 26)
+	keyBox.Position = UDim2.new(1, -58, 0.5, -13)
+	keyBox.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+	keyBox.Text = key
+	keyBox.TextColor3 = Color3.fromRGB(230, 230, 245)
+	keyBox.Font = Enum.Font.GothamBold
+	keyBox.TextSize = 13
+	keyBox.ZIndex = 12
+	keyBox.Parent = frame
+	Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
+	return y + 48
+end
+
+local function SetUIScale(scale)
+	CurrentScale = scale
+	Config.Scale = scale
+	local newWidth = math.floor(OriginalSize.X * scale)
+	local newHeight = math.floor(OriginalSize.Y * scale)
+	
+	TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Quint), {
+		Size = UDim2.new(0, newWidth, 0, newHeight),
+		Position = UDim2.new(0.5, -newWidth/2, 0.5, -newHeight/2)
+	}):Play()
+	
+	if Config.AutoSave then SaveConfig() end
+end
+
+-- Apply saved scale on load
+SetUIScale(CurrentScale)
+
+-- Tab content
+local function LoadSpeed()
+	ClearContent()
+	local y = 6
+	y = CreateSection("SPEED", y)
+	y = CreateValue("Normal Speed", 60, y)
+	y = CreateValue("Carry Speed", 30, y)
+	y = CreateValue("Lagger Normal", 15, y)
+	y = CreateValue("Lagger Carry", 24.5, y)
+	y = CreateValue("Mode", "Normal", y)
+	y = CreateSection("KEYBINDS", y)
+	y = CreateKeybind("Speed Key", "Q", y)
+	y = CreateKeybind("Lagger Key", "R", y)
+	ContentContainer.CanvasSize = UDim2.new(0, 0, 0, y + 15)
+end
+
+local function LoadCombat()
+	ClearContent()
+	local y = 6
+	y = CreateSection("COMBAT", y)
+	y = CreateToggle("Auto Bat", y, false)
+	y = CreateValue("Bat Speed", 58, y)
+	y = CreateValue("Bat Vert Speed", 52, y)
+	y = CreateToggle("Auto Swing", y, true)
+	y = CreateToggle("Bat Counter", y, false)
+	y = CreateToggle("TP Bat", y, false)
+	ContentContainer.CanvasSize = UDim2.new(0, 0, 0, y + 15)
+end
+
+local function LoadSteal()
+	ClearContent()
+	local y = 6
+	y = CreateSection("STEAL", y)
+	y = CreateValue("Radius", 60, y)
+	y = CreateValue("Duration (s)", 1.4, y)
+	y = CreateToggle("Auto Steal", y, false)
+	ContentContainer.CanvasSize = UDim2.new(0, 0, 0, y + 15)
+end
+
+local function LoadVisual()
+	ClearContent()
+	local y = 6
+	y = CreateToggle("Infinite Jump", y, false)
+	y = CreateToggle("Anti Ragdoll", y, false)
+	y = CreateToggle("Medusa Counter", y, false)
+	y = CreateToggle("Unwalk", y, false)
+	y = CreateSection("DISPLAY", y)
+	y = CreateToggle("Anti Lag", y, false)
+	y = CreateToggle("Stretch Rez", y, false)
+	y = CreateToggle("Custom FOV", y, false)
+	y = CreateValue("FOV Value", 70, y)
+	y = CreateToggle("Ultra Mode", y, false)
+	y = CreateToggle("Remove Accessories", y, false)
+	y = CreateToggle("Custom Font", y, false)
+	y = CreateToggle("Potato Graphics", y, false)
+	y = CreateValue("Custom Sky", "Off", y)
+	y = CreateSection("MOVEMENT", y)
+	y = CreateKeybind("Auto Left", "Z", y)
+	y = CreateKeybind("Auto Right", "C", y)
+	y = CreateKeybind("Drop Brainrot", "X", y)
+	y = CreateKeybind("TP Down", "F", y)
+	y = CreateToggle("Auto TP", y, false)
+	y = CreateValue("Auto TP Height", 20, y)
+	ContentContainer.CanvasSize = UDim2.new(0, 0, 0, y + 15)
+end
+
+local function LoadInterface()
+	ClearContent()
+	local y = 6
+	y = CreateSection("INTERFACE", y)
+	y = CreateKeybind("Hide UI", "LeftControl", y)
+	
+	-- Auto Save toggle
+	y = CreateToggle("Auto Save", y, Config.AutoSave, function(state)
+		Config.AutoSave = state
+		if state then SaveConfig() end
+	end)
+
+	-- Save Now row
+	local saveFrame = Instance.new("Frame")
+	saveFrame.Size = UDim2.new(1, -8, 0, 40)
+	saveFrame.Position = UDim2.new(0, 4, 0, y)
+	saveFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+	saveFrame.BackgroundTransparency = 0.2
+	saveFrame.ZIndex = 11
+	saveFrame.Parent = ContentContainer
+	Instance.new("UICorner", saveFrame).CornerRadius = UDim.new(0, 9)
+
+	local saveLabel = Instance.new("TextLabel")
+	saveLabel.Size = UDim2.new(0.6, 0, 1, 0)
+	saveLabel.Position = UDim2.new(0, 12, 0, 0)
+	saveLabel.BackgroundTransparency = 1
+	saveLabel.Text = "Save Now"
+	saveLabel.TextColor3 = Color3.fromRGB(235, 235, 245)
+	saveLabel.Font = Enum.Font.Gotham
+	saveLabel.TextSize = 14
+	saveLabel.TextXAlignment = Enum.TextXAlignment.Left
+	saveLabel.ZIndex = 12
+	saveLabel.Parent = saveFrame
+
+	local saveBtn = Instance.new("TextButton")
+	saveBtn.Size = UDim2.new(0, 80, 0, 28)
+	saveBtn.Position = UDim2.new(1, -92, 0.5, -14)
+	saveBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+	saveBtn.Text = "SAVE"
+	saveBtn.TextColor3 = Color3.fromRGB(240, 240, 250)
+	saveBtn.Font = Enum.Font.GothamBold
+	saveBtn.TextSize = 12
+	saveBtn.ZIndex = 12
+	saveBtn.Parent = saveFrame
+	Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0, 6)
+
+	saveBtn.MouseButton1Click:Connect(function()
+		SaveConfig()
+		saveBtn.Text = "SAVED!"
+		task.wait(0.8)
+		saveBtn.Text = "SAVE"
+	end)
+
+	y = y + 48
+	y = CreateSection("MOBILE", y)
+
+	-- Hide Mobile Buttons (WORKING)
+	y = CreateToggle("Hide Mobile Buttons", y, Config.HideMobileButtons, function(state)
+		Config.HideMobileButtons = state
+		SetMobileButtonsVisible(not state)
+		if Config.AutoSave then SaveConfig() end
+	end)
+
+	-- Scale buttons
+	local scaleFrame = Instance.new("Frame")
+	scaleFrame.Size = UDim2.new(1, -8, 0, 40)
+	scaleFrame.Position = UDim2.new(0, 4, 0, y)
+	scaleFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+	scaleFrame.BackgroundTransparency = 0.2
+	scaleFrame.ZIndex = 11
+	scaleFrame.Parent = ContentContainer
+	Instance.new("UICorner", scaleFrame).CornerRadius = UDim.new(0, 9)
+
+	local scales = {
+		{Text = "80%",  Value = 0.8},
+		{Text = "100%", Value = 1.0},
+		{Text = "125%", Value = 1.25},
+		{Text = "150%", Value = 1.5},
+		{Text = "175%", Value = 1.75},
+		{Text = "200%", Value = 2.0},
+	}
+
+	for i, s in ipairs(scales) do
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(0, 48, 0, 26)
+		b.Position = UDim2.new(0, 8 + (i-1)*52, 0.5, -13)
+		b.BackgroundColor3 = (math.abs(s.Value - CurrentScale) < 0.01) and Color3.fromRGB(240, 240, 250) or Color3.fromRGB(40, 40, 55)
+		b.Text = s.Text
+		b.TextColor3 = (math.abs(s.Value - CurrentScale) < 0.01) and Color3.fromRGB(20, 20, 30) or Color3.fromRGB(200, 200, 220)
+		b.Font = Enum.Font.GothamBold
+		b.TextSize = 11
+		b.ZIndex = 12
+		b.Parent = scaleFrame
+		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+
+		b.MouseButton1Click:Connect(function()
+			SetUIScale(s.Value)
+			for _, child in ipairs(scaleFrame:GetChildren()) do
+				if child:IsA("TextButton") then
+					child.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+					child.TextColor3 = Color3.fromRGB(200, 200, 220)
+				end
+			end
+			b.BackgroundColor3 = Color3.fromRGB(240, 240, 250)
+			b.TextColor3 = Color3.fromRGB(20, 20, 30)
+		end)
+	end
+
+	ContentContainer.CanvasSize = UDim2.new(0, 0, 0, y + 60)
+end
+
+local function SelectTab(name)
+	for tabName, data in pairs(TabButtons) do
+		if tabName == name then
+			data.Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+			data.Indicator.Visible = true
+		else
+			data.Button.TextColor3 = Color3.fromRGB(140, 140, 155)
+			data.Indicator.Visible = false
+		end
+	end
+	if name == "Speed" then LoadSpeed()
+	elseif name == "Combat" then LoadCombat()
+	elseif name == "Steal" then LoadSteal()
+	elseif name == "Visual" then LoadVisual()
+	elseif name == "Interface" then LoadInterface()
+	end
+end
+
+for name, data in pairs(TabButtons) do
+	data.Button.MouseButton1Click:Connect(function()
+		SelectTab(name)
+	end)
+end
+
+SelectTab("Speed")
+
+-- Dragging
+local dragging, dragInput, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = Main.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+TopBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- Open / Minimize
+OpenBtn.MouseButton1Click:Connect(function()
+	Main.Visible = true
+	OpenBtn.Visible = false
+end)
+
+MinBtn.MouseButton1Click:Connect(function()
+	Main.Visible = false
+	OpenBtn.Visible = true
+end)
+
+-- FPS / Ping
+local last = tick()
+RunService.RenderStepped:Connect(function()
+	local now = tick()
+	local fps = math.floor(1 / (now - last))
+	last = now
+	Stats.Text = "Ping: " .. math.floor(LocalPlayer:GetNetworkPing() * 1000) .. "  ·  FPS: " .. fps
+end)
+
+print("KINGG.VS Hub Loaded - Save System + Hide Mobile Buttons Ready")
